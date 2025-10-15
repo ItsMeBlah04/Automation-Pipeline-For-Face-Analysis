@@ -36,6 +36,13 @@ execute_remote() {
     ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no ec2-user@$PROD_EC2_HOST "$1"
 }
 
+# Function to copy files to remote EC2 instance
+copy_to_remote() {
+    echo "Copying $1 to remote host..."
+    # Use SCP with the SSH key provided by Jenkins credentials
+    scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$1" ec2-user@$PROD_EC2_HOST:~/
+}
+
 # Pre-deployment health check
 echo "Pre-deployment health check..."
 if ! curl -f http://$PROD_EC2_HOST/health > /dev/null 2>&1; then
@@ -54,31 +61,35 @@ execute_remote "aws configure set output json"
 # Login to ECR on remote host
 execute_remote "aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
-# Step 2: Pull latest Docker images
-echo "Step 2: Pulling latest Docker images..."
+# Step 2: Copy docker-compose configuration to remote host
+echo "Step 2: Copying docker-compose configuration..."
+copy_to_remote "infra/docker-compose.remote.yml"
+
+# Step 3: Pull latest Docker images
+echo "Step 3: Pulling latest Docker images..."
 execute_remote "docker pull $BACKEND_IMAGE"
 execute_remote "docker pull $FRONTEND_IMAGE"
 
-# Step 3: Create backup of current deployment (optional but recommended)
-echo "Step 3: Creating backup of current deployment..."
+# Step 4: Create backup of current deployment (optional but recommended)
+echo "Step 4: Creating backup of current deployment..."
 BACKUP_DIR="backup-$(date +%Y%m%d-%H%M%S)"
 execute_remote "mkdir -p $BACKUP_DIR"
 execute_remote "docker-compose -f docker-compose.remote.yml ps > $BACKUP_DIR/container-status.txt" || true
 
-# Step 4: Stop existing containers gracefully
-echo "Step 4: Stopping existing containers gracefully..."
+# Step 5: Stop existing containers gracefully
+echo "Step 5: Stopping existing containers gracefully..."
 execute_remote "docker-compose -f docker-compose.remote.yml down"
 
-# Step 5: Start services with new images
-echo "Step 5: Starting services with new images..."
-execute_remote "docker-compose -f docker-compose.remote.yml up -d"
+# Step 6: Start services with new images
+echo "Step 6: Starting services with new images..."
+execute_remote "export BACKEND_IMAGE=$BACKEND_IMAGE && export FRONTEND_IMAGE=$FRONTEND_IMAGE && docker-compose -f docker-compose.remote.yml up -d"
 
-# Step 6: Wait for services to be healthy
-echo "Step 6: Waiting for services to be healthy..."
+# Step 7: Wait for services to be healthy
+echo "Step 7: Waiting for services to be healthy..."
 sleep 45
 
-# Step 7: Post-deployment health check
-echo "Step 7: Post-deployment health check..."
+# Step 8: Post-deployment health check
+echo "Step 8: Post-deployment health check..."
 if curl -f http://$PROD_EC2_HOST/health > /dev/null 2>&1; then
     echo "Production service is healthy after deployment"
 else
@@ -89,12 +100,12 @@ else
     exit 1
 fi
 
-# Step 8: Clean up unused Docker images
-echo "Step 8: Cleaning up unused Docker images..."
+# Step 9: Clean up unused Docker images
+echo "Step 9: Cleaning up unused Docker images..."
 execute_remote "docker image prune -f"
 
-# Step 9: Show running containers
-echo "Step 9: Showing running containers..."
+# Step 10: Show running containers
+echo "Step 10: Showing running containers..."
 execute_remote "docker ps"
 
 echo "Production deployment completed successfully!"

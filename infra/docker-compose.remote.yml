@@ -6,10 +6,8 @@ version: '3.8'
 services:
   # Backend API Service (FastAPI)
   backend:
-    # Build from the backend Dockerfile in the parent directory
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile.backend
+    # Use pre-built image from ECR (image name will be set via environment variable)
+    image: ${BACKEND_IMAGE:-863518413893.dkr.ecr.ap-southeast-2.amazonaws.com/faceapp-backend:latest}
     # Container name for easy reference
     container_name: face-analysis-backend
     # Restart policy for production resilience
@@ -45,10 +43,8 @@ services:
 
   # Frontend Web Service (Nginx)
   frontend:
-    # Build from the frontend Dockerfile in the parent directory
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile.frontend
+    # Use pre-built image from ECR (image name will be set via environment variable)
+    image: ${FRONTEND_IMAGE:-863518413893.dkr.ecr.ap-southeast-2.amazonaws.com/faceapp-frontend:latest}
     # Container name for easy reference
     container_name: face-analysis-frontend
     # Restart policy for production resilience

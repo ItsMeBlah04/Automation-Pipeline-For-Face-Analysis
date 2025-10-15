@@ -36,6 +36,13 @@ execute_remote() {
     ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no ec2-user@$STAGING_EC2_HOST "$1"
 }
 
+# Function to copy files to remote EC2 instance
+copy_to_remote() {
+    echo "Copying $1 to remote host..."
+    # Use SCP with the SSH key provided by Jenkins credentials
+    scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$1" ec2-user@$STAGING_EC2_HOST:~/
+}
+
 # Step 1: Configure AWS credentials and login to ECR on remote host
 echo "Step 1: Configuring AWS credentials and logging into ECR..."
 execute_remote "aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID"
@@ -46,29 +53,33 @@ execute_remote "aws configure set output json"
 # Login to ECR on remote host
 execute_remote "aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
-# Step 2: Pull latest Docker images
-echo "Step 2: Pulling latest Docker images..."
+# Step 2: Copy docker-compose configuration to remote host
+echo "Step 2: Copying docker-compose configuration..."
+copy_to_remote "infra/docker-compose.remote.yml"
+
+# Step 3: Pull latest Docker images
+echo "Step 3: Pulling latest Docker images..."
 execute_remote "docker pull $BACKEND_IMAGE"
 execute_remote "docker pull $FRONTEND_IMAGE"
 
-# Step 3: Stop existing containers
-echo "Step 3: Stopping existing containers..."
+# Step 4: Stop existing containers
+echo "Step 4: Stopping existing containers..."
 execute_remote "docker-compose -f docker-compose.remote.yml down" || echo "No existing containers to stop"
 
-# Step 4: Start services with new images
-echo "Step 4: Starting services with new images..."
-execute_remote "docker-compose -f docker-compose.remote.yml up -d"
+# Step 5: Start services with new images
+echo "Step 5: Starting services with new images..."
+execute_remote "export BACKEND_IMAGE=$BACKEND_IMAGE && export FRONTEND_IMAGE=$FRONTEND_IMAGE && docker-compose -f docker-compose.remote.yml up -d"
 
-# Step 5: Wait for services to be healthy
-echo "Step 5: Waiting for services to be healthy..."
+# Step 6: Wait for services to be healthy
+echo "Step 6: Waiting for services to be healthy..."
 sleep 30
 
-# Step 6: Clean up unused Docker images
-echo "Step 6: Cleaning up unused Docker images..."
+# Step 7: Clean up unused Docker images
+echo "Step 7: Cleaning up unused Docker images..."
 execute_remote "docker image prune -f"
 
-# Step 7: Show running containers
-echo "Step 7: Showing running containers..."
+# Step 8: Show running containers
+echo "Step 8: Showing running containers..."
 execute_remote "docker ps"
 
 echo "Staging deployment completed successfully!"
