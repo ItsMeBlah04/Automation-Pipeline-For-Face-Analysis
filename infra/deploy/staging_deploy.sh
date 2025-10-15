@@ -43,9 +43,8 @@ execute_remote "aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY"
 execute_remote "aws configure set region $AWS_REGION"
 execute_remote "aws configure set output json"
 
-# Login to ECR
-ECR_LOGIN_CMD=$(aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com)
-execute_remote "$ECR_LOGIN_CMD"
+# Login to ECR on remote host
+execute_remote "aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
 # Step 2: Pull latest Docker images
 echo "Step 2: Pulling latest Docker images..."
