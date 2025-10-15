@@ -128,7 +128,6 @@ pipeline {
                         sh """
                             export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
                             export AWS_REGION=${AWS_REGION}
-                            export ECR_REPO_NAME=${ECR_REPO_NAME}
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                             ./staging_deploy.sh
@@ -156,6 +155,10 @@ pipeline {
             steps {
                 echo 'Deploying to production environment...'
                 script {
+                    // Copy deployment files to Jenkins workspace
+                    sh "cp ${DEPLOYMENT_PATH}/prod_deploy.sh ."
+                    sh "chmod +x prod_deploy.sh"
+
                     // Deploy to production
                     withCredentials([
                         sshUserPrivateKey(credentialsId: "${SSH_KEY_CREDENTIALS_ID}", keyFileVariable: 'SSH_KEY'),
@@ -164,7 +167,6 @@ pipeline {
                         sh """
                             export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
                             export AWS_REGION=${AWS_REGION}
-                            export ECR_REPO_NAME=${ECR_REPO_NAME}
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                             ./prod_deploy.sh
