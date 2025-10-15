@@ -56,18 +56,44 @@ pipeline {
             }
         }
 
+        stage('Cleanup Previous Test Containers') {
+            steps {
+                echo 'Removing any leftover test containers from previous runs...'
+                script {
+                    sh """
+                        # Remove all test containers matching our pattern
+                        docker ps -a --filter "name=test-backend-" --filter "name=test-frontend-" -q | xargs -r docker rm -f || true
+                        echo "Cleanup complete"
+                    """
+                }
+            }
+        }
+
         stage('Test Docker Images') {
+            // NOTE: Container names now include BUILD_NUMBER to ensure uniqueness per build
+            // This prevents "container name already in use" errors when tests fail
+            // Cleanup: 1) Pre-cleanup before tests, 2) Trap handlers on exit, 3) Final cleanup in Cleanup stage
             parallel {
                 stage('Test Backend Image') {
                     steps {
                         echo 'Testing backend Docker image...'
                         script {
                             sh """
-                                docker run --rm -d --name test-backend -p 8001:8000 ${DOCKER_BACKEND_IMAGE}
+                                # Define unique container name for this build
+                                TEST_BACKEND_CONTAINER="test-backend-${BUILD_NUMBER}"
+                                
+                                # Force remove any leftover container from previous runs
+                                docker rm -f \$TEST_BACKEND_CONTAINER 2>/dev/null || true
+                                
+                                # Run test container
+                                docker run --rm -d --name \$TEST_BACKEND_CONTAINER -p 8001:8000 ${DOCKER_BACKEND_IMAGE}
+                                
+                                # Set trap to cleanup on exit
+                                trap "docker rm -f \$TEST_BACKEND_CONTAINER 2>/dev/null || true" EXIT
+                                
                                 sleep 10
                                 curl -f http://localhost:8001/health || exit 1
                                 curl -f http://localhost:8001/ | grep -q 'Hello from backend' || exit 1
-                                docker stop test-backend
                             """
                         }
                     }
@@ -77,11 +103,21 @@ pipeline {
                         echo 'Testing frontend Docker image...'
                         script {
                             sh """
-                                docker run --rm -d --name test-frontend -p 8002:80 ${DOCKER_FRONTEND_IMAGE}
+                                # Define unique container name for this build
+                                TEST_FRONTEND_CONTAINER="test-frontend-${BUILD_NUMBER}"
+                                
+                                # Force remove any leftover container from previous runs
+                                docker rm -f \$TEST_FRONTEND_CONTAINER 2>/dev/null || true
+                                
+                                # Run test container
+                                docker run --rm -d --name \$TEST_FRONTEND_CONTAINER -p 8002:80 ${DOCKER_FRONTEND_IMAGE}
+                                
+                                # Set trap to cleanup on exit
+                                trap "docker rm -f \$TEST_FRONTEND_CONTAINER 2>/dev/null || true" EXIT
+                                
                                 sleep 10
                                 curl -f http://localhost:8002/health || exit 1
                                 curl -f http://localhost:8002/ | grep -q 'Hello World Frontend' || exit 1
-                                docker stop test-frontend
                             """
                         }
                     }
