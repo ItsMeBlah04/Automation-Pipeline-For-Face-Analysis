@@ -1,0 +1,90 @@
+version: '3.8'
+
+# Docker Compose configuration for remote deployment (AWS EC2)
+# This file defines the services that will run on staging and production environments
+
+services:
+  # Backend API Service (FastAPI)
+  backend:
+    # Build from the backend Dockerfile in the parent directory
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.backend
+    # Container name for easy reference
+    container_name: face-analysis-backend
+    # Restart policy for production resilience
+    restart: unless-stopped
+    # Port mapping: host port 8000 -> container port 8000
+    ports:
+      - "8000:8000"
+    # Environment variables (can be overridden in deployment)
+    environment:
+      - ENVIRONMENT=production
+    # Health check for the backend service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Frontend Web Service (Nginx)
+  frontend:
+    # Build from the frontend Dockerfile in the parent directory
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.frontend
+    # Container name for easy reference
+    container_name: face-analysis-frontend
+    # Restart policy for production resilience
+    restart: unless-stopped
+    # Port mapping: host port 80 -> container port 80
+    ports:
+      - "80:80"
+    # Depends on backend for full functionality (though not strictly required for hello world)
+    depends_on:
+      backend:
+        condition: service_healthy
+    # Health check for the frontend service
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Networks configuration for service communication
+networks:
+  default:
+    name: face-analysis-network
+    driver: bridge
