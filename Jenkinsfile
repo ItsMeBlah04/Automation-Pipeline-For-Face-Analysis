@@ -70,9 +70,10 @@ pipeline {
         }
 
         stage('Test Docker Images') {
-            // NOTE: Container names now include BUILD_NUMBER to ensure uniqueness per build
-            // This prevents "container name already in use" errors when tests fail
-            // Cleanup: 1) Pre-cleanup before tests, 2) Trap handlers on exit, 3) Final cleanup in Cleanup stage
+            // NOTE: Using dynamic port allocation to avoid port conflicts when:
+            // - Multiple builds run in parallel
+            // - Previous containers haven't fully released ports
+            // Docker assigns a random available port, which we query using 'docker port'
             parallel {
                 stage('Test Backend Image') {
                     steps {
@@ -85,15 +86,21 @@ pipeline {
                                 # Force remove any leftover container from previous runs
                                 docker rm -f \$TEST_BACKEND_CONTAINER 2>/dev/null || true
                                 
-                                # Run test container
-                                docker run --rm -d --name \$TEST_BACKEND_CONTAINER -p 8001:8000 ${DOCKER_BACKEND_IMAGE}
+                                # Run test container with dynamic port (-p 0:8000 assigns random available port)
+                                docker run --rm -d --name \$TEST_BACKEND_CONTAINER -p 0:8000 ${DOCKER_BACKEND_IMAGE}
                                 
                                 # Set trap to cleanup on exit
                                 trap "docker rm -f \$TEST_BACKEND_CONTAINER 2>/dev/null || true" EXIT
                                 
+                                # Get the dynamically assigned port
+                                BACKEND_PORT=\$(docker port \$TEST_BACKEND_CONTAINER 8000 | cut -d: -f2)
+                                echo "Backend test container running on port \$BACKEND_PORT"
+                                
                                 sleep 10
-                                curl -f http://localhost:8001/health || exit 1
-                                curl -f http://localhost:8001/ | grep -q 'Hello from backend' || exit 1
+                                curl -f http://localhost:\$BACKEND_PORT/health || exit 1
+                                curl -f http://localhost:\$BACKEND_PORT/ | grep -q 'Hello from backend' || exit 1
+                                
+                                echo "Backend tests passed on port \$BACKEND_PORT"
                             """
                         }
                     }
@@ -109,15 +116,21 @@ pipeline {
                                 # Force remove any leftover container from previous runs
                                 docker rm -f \$TEST_FRONTEND_CONTAINER 2>/dev/null || true
                                 
-                                # Run test container
-                                docker run --rm -d --name \$TEST_FRONTEND_CONTAINER -p 8002:80 ${DOCKER_FRONTEND_IMAGE}
+                                # Run test container with dynamic port (-p 0:80 assigns random available port)
+                                docker run --rm -d --name \$TEST_FRONTEND_CONTAINER -p 0:80 ${DOCKER_FRONTEND_IMAGE}
                                 
                                 # Set trap to cleanup on exit
                                 trap "docker rm -f \$TEST_FRONTEND_CONTAINER 2>/dev/null || true" EXIT
                                 
+                                # Get the dynamically assigned port
+                                FRONTEND_PORT=\$(docker port \$TEST_FRONTEND_CONTAINER 80 | cut -d: -f2)
+                                echo "Frontend test container running on port \$FRONTEND_PORT"
+                                
                                 sleep 10
-                                curl -f http://localhost:8002/health || exit 1
-                                curl -f http://localhost:8002/ | grep -q 'Hello World Frontend' || exit 1
+                                curl -f http://localhost:\$FRONTEND_PORT/health || exit 1
+                                curl -f http://localhost:\$FRONTEND_PORT/ | grep -q 'Hello World Frontend' || exit 1
+                                
+                                echo "Frontend tests passed on port \$FRONTEND_PORT"
                             """
                         }
                     }
