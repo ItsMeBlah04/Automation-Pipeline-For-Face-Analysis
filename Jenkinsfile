@@ -15,6 +15,7 @@ pipeline {
         STAGING_EC2_HOST = 'ec2-13-211-148-206.ap-southeast-2.compute.amazonaws.com'
         PROD_EC2_HOST = 'ec2-54-253-87-187.ap-southeast-2.compute.amazonaws.com'
         SSH_KEY_CREDENTIALS_ID = 'ec2-user'
+        AWS_CREDENTIALS_ID = 'aws-creds'
 
         // Docker Configuration - Using separate ECR repositories
         DOCKER_BACKEND_IMAGE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_BACKEND_REPO}:${env.BUILD_NUMBER}"
@@ -92,18 +93,21 @@ pipeline {
             steps {
                 echo 'Pushing images to AWS ECR...'
                 script {
-                    // Login to ECR
-                    sh "\$(aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com)"
+                    // Use AWS credentials for ECR operations
+                    withAWS(credentials: "${AWS_CREDENTIALS_ID}", region: "${AWS_REGION}") {
+                        // Login to ECR
+                        sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
-                    // Push backend image
-                    sh "docker push ${DOCKER_BACKEND_IMAGE}"
-                    sh "docker tag ${DOCKER_BACKEND_IMAGE} ${DOCKER_BACKEND_LATEST}"
-                    sh "docker push ${DOCKER_BACKEND_LATEST}"
+                        // Push backend image
+                        sh "docker push ${DOCKER_BACKEND_IMAGE}"
+                        sh "docker tag ${DOCKER_BACKEND_IMAGE} ${DOCKER_BACKEND_LATEST}"
+                        sh "docker push ${DOCKER_BACKEND_LATEST}"
 
-                    // Push frontend image
-                    sh "docker push ${DOCKER_FRONTEND_IMAGE}"
-                    sh "docker tag ${DOCKER_FRONTEND_IMAGE} ${DOCKER_FRONTEND_LATEST}"
-                    sh "docker push ${DOCKER_FRONTEND_LATEST}"
+                        // Push frontend image
+                        sh "docker push ${DOCKER_FRONTEND_IMAGE}"
+                        sh "docker tag ${DOCKER_FRONTEND_IMAGE} ${DOCKER_FRONTEND_LATEST}"
+                        sh "docker push ${DOCKER_FRONTEND_LATEST}"
+                    }
                 }
             }
         }
@@ -117,11 +121,16 @@ pipeline {
                     sh "chmod +x staging_deploy.sh"
 
                     // Deploy to staging
-                    withCredentials([sshUserPrivateKey(credentialsId: "${SSH_KEY_CREDENTIALS_ID}", keyFileVariable: 'SSH_KEY')]) {
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: "${SSH_KEY_CREDENTIALS_ID}", keyFileVariable: 'SSH_KEY'),
+                        aws(credentialsId: "${AWS_CREDENTIALS_ID}", accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
                         sh """
                             export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
                             export AWS_REGION=${AWS_REGION}
                             export ECR_REPO_NAME=${ECR_REPO_NAME}
+                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                             ./staging_deploy.sh
                         """
                     }
@@ -148,11 +157,16 @@ pipeline {
                 echo 'Deploying to production environment...'
                 script {
                     // Deploy to production
-                    withCredentials([sshUserPrivateKey(credentialsId: "${SSH_KEY_CREDENTIALS_ID}", keyFileVariable: 'SSH_KEY')]) {
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: "${SSH_KEY_CREDENTIALS_ID}", keyFileVariable: 'SSH_KEY'),
+                        aws(credentialsId: "${AWS_CREDENTIALS_ID}", accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
                         sh """
                             export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
                             export AWS_REGION=${AWS_REGION}
                             export ECR_REPO_NAME=${ECR_REPO_NAME}
+                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                             ./prod_deploy.sh
                         """
                     }

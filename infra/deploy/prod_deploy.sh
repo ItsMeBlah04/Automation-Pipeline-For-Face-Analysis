@@ -44,8 +44,14 @@ else
     echo "Production service is currently healthy"
 fi
 
-# Step 1: Login to AWS ECR on remote host
-echo "Step 1: Logging into AWS ECR..."
+# Step 1: Configure AWS credentials and login to ECR on remote host
+echo "Step 1: Configuring AWS credentials and logging into ECR..."
+execute_remote "aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID"
+execute_remote "aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY"
+execute_remote "aws configure set region $AWS_REGION"
+execute_remote "aws configure set output json"
+
+# Login to ECR
 ECR_LOGIN_CMD=$(aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com)
 execute_remote "$ECR_LOGIN_CMD"
 
