@@ -13,7 +13,7 @@ AWS_ACCOUNT_ID="863518413893"
 AWS_REGION="ap-southeast-2"
 ECR_BACKEND_REPO="faceapp-backend"
 ECR_FRONTEND_REPO="faceapp-frontend"
-STAGING_EC2_HOST="ec2-13-211-148-206.ap-southeast-2.compute.amazonaws.com"
+STAGING_EC2_HOST="ec2-54-79-229-133.ap-southeast-2.compute.amazonaws.com"
 # SSH key will be provided by Jenkins credentials as SSH_KEY environment variable
 
 # Docker image tags - Using separate ECR repositories

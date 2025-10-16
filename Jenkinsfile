@@ -12,8 +12,8 @@ pipeline {
         ECR_FRONTEND_REPO = 'faceapp-frontend'
 
         // EC2 Configuration - Updated with actual values
-        STAGING_EC2_HOST = 'ec2-13-211-148-206.ap-southeast-2.compute.amazonaws.com'
-        PROD_EC2_HOST = 'ec2-54-253-87-187.ap-southeast-2.compute.amazonaws.com'
+        STAGING_EC2_HOST = 'ec2-54-79-229-133.ap-southeast-2.compute.amazonaws.com'
+        PROD_EC2_HOST = 'ec2-13-54-122-153.ap-southeast-2.compute.amazonaws.com'
         SSH_KEY_CREDENTIALS_ID = 'ssh-ec2'
         AWS_CREDENTIALS_ID = 'aws-creds'
 
