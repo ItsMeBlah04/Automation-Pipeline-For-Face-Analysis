@@ -28,6 +28,17 @@ pipeline {
     }
 
     stages {
+        stage('Initialize') {
+            steps {
+                script {
+                    echo "================================"
+                    echo "Building branch: ${env.BRANCH_NAME}"
+                    echo "Build number: ${env.BUILD_NUMBER}"
+                    echo "================================"
+                }
+            }
+        }
+
         stage('Checkout') {
             steps {
                 echo 'Checking out source code from GitHub...'
@@ -162,6 +173,13 @@ pipeline {
         }
 
         stage('Deploy to Staging') {
+            // Deploy to staging for both 'staging' and 'main' branches
+            when {
+                anyOf {
+                    branch 'staging'
+                    branch 'main'
+                }
+            }
             steps {
                 echo 'Deploying to staging environment...'
                 script {
@@ -187,6 +205,12 @@ pipeline {
         }
 
         stage('Smoke Test Staging') {
+            when {
+                anyOf {
+                    branch 'staging'
+                    branch 'main'
+                }
+            }
             steps {
                 echo 'Running smoke tests on staging...'
                 script {
@@ -200,7 +224,28 @@ pipeline {
             }
         }
 
+        stage('Approve Production Deployment') {
+            // Only ask for approval when deploying from main branch
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo 'Waiting for approval to deploy to production...'
+                    timeout(time: 15, unit: 'MINUTES') {
+                        input message: 'Deploy to Production?', 
+                              ok: 'Deploy',
+                              submitter: 'admin'
+                    }
+                }
+            }
+        }
+
         stage('Deploy to Production') {
+            // Only deploy to production from main branch
+            when {
+                branch 'main'
+            }
             steps {
                 echo 'Deploying to production environment...'
                 script {
@@ -226,6 +271,10 @@ pipeline {
         }
 
         stage('Smoke Test Production') {
+            // Only test production when deployed from main branch
+            when {
+                branch 'main'
+            }
             steps {
                 echo 'Running smoke tests on production...'
                 script {
@@ -256,15 +305,26 @@ pipeline {
             echo 'Pipeline execution completed'
         }
         success {
-            echo 'Pipeline executed successfully!'
-            echo 'Application URLs:'
-            echo "   Staging Frontend: http://${STAGING_EC2_HOST}"
-            echo "   Production Frontend: http://${PROD_EC2_HOST}"
+            script {
+                echo 'Pipeline executed successfully!'
+                echo "Branch: ${env.BRANCH_NAME}"
+                echo 'Application URLs:'
+                
+                if (env.BRANCH_NAME == 'staging') {
+                    echo "   Staging Frontend: http://${STAGING_EC2_HOST}"
+                } else if (env.BRANCH_NAME == 'main') {
+                    echo "   Staging Frontend: http://${STAGING_EC2_HOST}"
+                    echo "   Production Frontend: http://${PROD_EC2_HOST}"
+                }
+            }
         }
         failure {
-            echo 'Pipeline failed!'
-            echo 'Check the Jenkins console output for details'
-            echo 'Notify the development team'
+            script {
+                echo 'Pipeline failed!'
+                echo "Branch: ${env.BRANCH_NAME}"
+                echo 'Check the Jenkins console output for details'
+                echo 'Notify the development team'
+            }
         }
     }
 }
