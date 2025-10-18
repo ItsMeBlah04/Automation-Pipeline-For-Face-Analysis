@@ -1,13 +1,22 @@
-// Temporary fake data until backend is ready.
-export async function analyzeImage(file){
-  await new Promise(r=>setTimeout(r,900))
-  return {
-    faces:[{
-      box:[100,100,200,200],
-      emotion:{label:'happy',score:0.95},
-      age:{label:'18-24',score:0.87},
-      gender:{label:'female',score:0.90}
-    }],
-    latency_ms:512
+const FALLBACK_URL = typeof window !== "undefined"
+  ? `${window.location.protocol}//${window.location.hostname}:8000`
+  : "http://127.0.0.1:8000";
+
+const API_URL = import.meta.env.VITE_API_URL ?? FALLBACK_URL;
+
+export async function analyzeImage(file) {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const response = await fetch(`${API_URL}/analyze`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Face analysis request failed");
   }
+
+  return response.json();
 }
