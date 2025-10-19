@@ -120,7 +120,20 @@ pipeline {
                                 BACKEND_PORT=\$(docker port \$TEST_BACKEND_CONTAINER 8000 | cut -d: -f2)
                                 echo "Backend test container running on port \$BACKEND_PORT"
                                 
-                                sleep 10
+                                # Wait for backend to initialize and load ML models
+                                sleep 15
+                                
+                                # Retry health check up to 3 times
+                                for i in {1..3}; do
+                                    if curl -f http://localhost:\$BACKEND_PORT/health 2>/dev/null; then
+                                        echo "Backend health check passed"
+                                        break
+                                    fi
+                                    echo "Health check attempt \$i failed, retrying..."
+                                    sleep 5
+                                done
+                                
+                                # Final check - fail if still not healthy
                                 curl -f http://localhost:\$BACKEND_PORT/health || exit 1
                                 curl -f http://localhost:\$BACKEND_PORT/docs || exit 1
                                 
