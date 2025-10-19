@@ -52,7 +52,7 @@ pipeline {
                     steps {
                         echo 'Building backend Docker image...'
                         script {
-                            docker.build("${DOCKER_BACKEND_IMAGE}", '-f infra/Dockerfile.backend .')
+                            docker.build("${DOCKER_BACKEND_IMAGE}", '-f backend/Dockerfile ./backend')
                         }
                     }
                 }
@@ -60,7 +60,7 @@ pipeline {
                     steps {
                         echo 'Building frontend Docker image...'
                         script {
-                            docker.build("${DOCKER_FRONTEND_IMAGE}", '-f infra/Dockerfile.frontend .')
+                            docker.build("${DOCKER_FRONTEND_IMAGE}", '-f frontend/Dockerfile ./frontend')
                         }
                     }
                 }
@@ -109,7 +109,7 @@ pipeline {
                                 
                                 sleep 10
                                 curl -f http://localhost:\$BACKEND_PORT/health || exit 1
-                                curl -f http://localhost:\$BACKEND_PORT/ | grep -q 'Hello from backend' || exit 1
+                                curl -f http://localhost:\$BACKEND_PORT/docs || exit 1
                                 
                                 echo "Backend tests passed on port \$BACKEND_PORT"
                             """
@@ -139,7 +139,7 @@ pipeline {
                                 
                                 sleep 10
                                 curl -f http://localhost:\$FRONTEND_PORT/health || exit 1
-                                curl -f http://localhost:\$FRONTEND_PORT/ | grep -q 'Hello World Frontend' || exit 1
+                                curl -f http://localhost:\$FRONTEND_PORT/ | grep -qi 'Face Analysis' || exit 1
                                 
                                 echo "Frontend tests passed on port \$FRONTEND_PORT"
                             """
