@@ -4,6 +4,11 @@
 pipeline {
     agent any
 
+    // Only run pipeline for main and staging branches
+    options {
+        skipDefaultCheckout(false)
+    }
+
     environment {
         // AWS Configuration - Updated with actual values
         AWS_ACCOUNT_ID = '863518413893'
@@ -35,6 +40,14 @@ pipeline {
                     echo "Building branch: ${env.BRANCH_NAME}"
                     echo "Build number: ${env.BUILD_NUMBER}"
                     echo "================================"
+                    
+                    // Only allow main and staging branches
+                    if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'staging') {
+                        echo "Branch '${env.BRANCH_NAME}' is not configured for CI/CD. Only 'main' and 'staging' branches are allowed."
+                        echo "Skipping pipeline execution."
+                        currentBuild.result = 'ABORTED'
+                        error("Pipeline aborted: Branch '${env.BRANCH_NAME}' is not allowed")
+                    }
                 }
             }
         }
