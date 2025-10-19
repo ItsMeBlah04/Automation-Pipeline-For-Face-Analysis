@@ -24,6 +24,8 @@ _pipeline: Optional[StreamingFaceAnalysis] = None
 DEFAULT_ORIGINS = {
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://ec2-54-79-229-133.ap-southeast-2.compute.amazonaws.com",
+    "http://ec2-13-54-122-153.ap-southeast-2.compute.amazonaws.com",
 }
 
 
