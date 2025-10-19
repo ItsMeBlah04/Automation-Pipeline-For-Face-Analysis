@@ -163,8 +163,20 @@ pipeline {
                                 FRONTEND_PORT=\$(docker port \$TEST_FRONTEND_CONTAINER 80 | cut -d: -f2)
                                 echo "Frontend test container running on port \$FRONTEND_PORT"
                                 
-                                sleep 10
+                                # Wait for nginx to start
+                                sleep 5
+                                
+                                # Check if container is still running
+                                if ! docker ps | grep -q \$TEST_FRONTEND_CONTAINER; then
+                                    echo "ERROR: Frontend container stopped unexpectedly"
+                                    docker logs \$TEST_FRONTEND_CONTAINER
+                                    exit 1
+                                fi
+                                
+                                # Test health endpoint
                                 curl -f http://localhost:\$FRONTEND_PORT/health || exit 1
+                                
+                                # Test that frontend serves static files
                                 curl -f http://localhost:\$FRONTEND_PORT/ | grep -qi 'Face Analysis' || exit 1
                                 
                                 echo "Frontend tests passed on port \$FRONTEND_PORT"
