@@ -69,19 +69,29 @@ run_test() {
 # Create a test image (100x100 solid color PNG) for API testing
 create_test_image() {
     local output_file="$1"
-    # Create a simple 100x100 PNG using ImageMagick (if available) or Python
-    if command -v convert &> /dev/null; then
-        convert -size 100x100 xc:blue "$output_file" 2>/dev/null
-    elif command -v python3 &> /dev/null; then
-        python3 -c "
-from PIL import Image
-img = Image.new('RGB', (100, 100), color='blue')
-img.save('$output_file')
-" 2>/dev/null
-    else
-        # Fallback: create a minimal valid PNG file (1x1 pixel)
-        printf '\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90\x77\x53\xde\x00\x00\x00\x0c\x49\x44\x41\x54\x08\xd7\x63\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\x18\xdd\x8d\xb4\x00\x00\x00\x00\x49\x45\x4e\x44\xae\x42\x60\x82' > "$output_file"
+    # Prefer ImageMagick if available
+    if command -v convert >/dev/null 2>&1; then
+        if convert -size 100x100 xc:blue "$output_file" >/dev/null 2>&1; then
+            return 0
+        fi
     fi
+    # Use Python only if Pillow is present; guard under if to avoid set -e exit
+    if command -v python3 >/dev/null 2>&1; then
+        if python3 - "$output_file" >/dev/null 2>&1 <<'PY'
+import sys
+try:
+    from PIL import Image
+except Exception:
+    sys.exit(2)
+img = Image.new('RGB', (100, 100), color='blue')
+img.save(sys.argv[1])
+PY
+        then
+            return 0
+        fi
+    fi
+    # Fallback: create a minimal valid PNG file (1x1 pixel)
+    printf '\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90\x77\x53\xde\x00\x00\x00\x0c\x49\x44\x41\x54\x08\xd7\x63\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\x18\xdd\x8d\xb4\x00\x00\x00\x00\x49\x45\x4e\x44\xae\x42\x60\x82' > "$output_file"
 }
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
