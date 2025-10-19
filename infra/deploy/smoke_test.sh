@@ -98,25 +98,42 @@ create_test_image() {
         fi
     fi
     
-    # Try Python with Pillow
+    # Try Python (prefer Pillow, fall back to embedded PNG)
     if command -v python3 &>/dev/null; then
-        python3 - "$output_file" 2>/dev/null <<'PYTHON'
+        python3 - "$output_file" <<'PYTHON'
+import base64
 import sys
+from pathlib import Path
+
+target = Path(sys.argv[1])
+
 try:
-    from PIL import Image
-img = Image.new('RGB', (100, 100), color='blue')
-img.save(sys.argv[1])
-    sys.exit(0)
-except Exception as e:
-    sys.exit(1)
+    from PIL import Image  # type: ignore
+except Exception:
+    pass
+else:
+    try:
+        Image.new("RGB", (100, 100), color="blue").save(target)
+        sys.exit(0)
+    except Exception:
+        pass
+
+PNG_BASE64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAEAAAABABAMAAABYR2ztAAAAG1BMVEUAAAD///8fHx9fX18/Pz9/f3+fn5/f39+/v78eUxeLAAAACXB"
+    "IWXMAAA7EAAAOxAGVKw4bAAAAS0lEQVRIiWNgGAWjQEUBXUTZAMpgMQGRjQHoChwFoAxWMTopUMJwJJoCTEB/Bc6EHDkwISkIA7gUiJ"
+    "dDQOEAOnJUwdBRMApGAQgAAOgMJ/v7abSCAAAAAElFTkSuQmCC"
+)
+
+target.write_bytes(base64.b64decode(PNG_BASE64))
+sys.exit(0)
 PYTHON
         if [ $? -eq 0 ]; then
             return 0
         fi
     fi
     
-    # Fallback: minimal valid PNG (1x1 pixel blue)
-    printf '\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90\x77\x53\xde\x00\x00\x00\x0c\x49\x44\x41\x54\x08\xd7\x63\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\x18\xdd\x8d\xb4\x00\x00\x00\x00\x49\x45\x4e\x44\xae\x42\x60\x82' > "$output_file"
+    # Fallback: embedded 64x64 PNG (no external tooling required)
+    printf '\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52\x00\x00\x00\x40\x00\x00\x00\x40\x04\x03\x00\x00\x00\x58\x47\x6c\xed\x00\x00\x00\x1b\x50\x4c\x54\x45\x00\x00\x00\xff\xff\xff\x1f\x1f\x1f\x5f\x5f\x5f\x3f\x3f\x3f\x7f\x7f\x7f\x9f\x9f\x9f\xdf\xdf\xdf\xbf\xbf\xbf\x1e\x53\x17\x8b\x00\x00\x00\x09\x70\x48\x59\x73\x00\x00\x0e\xc4\x00\x00\x0e\xc4\x01\x95\x2b\x0e\x1b\x00\x00\x00\x4b\x49\x44\x41\x54\x48\x89\x63\x60\x18\x05\xa3\x40\x45\x01\x5d\x44\xd9\x00\xca\x60\x31\x01\x91\x8d\x01\xe8\x0a\x1c\x05\xa0\x0c\x56\x31\x3a\x29\x50\xc2\x70\x24\x9a\x02\x4c\x40\x7f\x05\xce\x84\x1c\x39\x30\x21\x29\x08\x03\xb8\x14\x88\x97\x43\x40\xe1\x00\x3a\x72\x54\xc1\xd0\x51\x30\x0a\x46\x01\x08\x00\x00\xe8\x0c\x27\xfb\xfb\x69\xb4\x82\x00\x00\x00\x00\x49\x45\x4e\x44\xae\x42\x60\x82' > "$output_file"
     return 0
 }
 
@@ -140,6 +157,8 @@ make_request() {
     
     if [ -n "$output_file" ]; then
         curl_opts+=(--output "$output_file")
+    else
+        curl_opts+=(--output /dev/null)
     fi
     
     if [ "$method" = "POST" ]; then
@@ -316,11 +335,11 @@ run_error_handling_tests() {
     local EMPTY_FILE="$TEMP_DIR/empty.txt"
 touch "$EMPTY_FILE"
 run_test "Empty File Upload Returns 400" \
-    "[ \"\$(curl --silent --max-time $CURL_TIMEOUT_ANALYZE -X POST -F 'image=@$EMPTY_FILE' http://$EC2_HOST/analyze 2>/dev/null | tail -c 3)\" = \"400\" ]"
+    "[ \"\$(make_request POST http://$EC2_HOST/analyze $EMPTY_FILE '' $CURL_TIMEOUT_ANALYZE)\" = \"400\" ]"
 
     # Test 15: Missing Parameter Returns 422
 run_test "Missing Image Parameter Returns 422" \
-    "[ \"\$(curl --silent --max-time $CURL_TIMEOUT_ANALYZE -X POST http://$EC2_HOST/analyze 2>/dev/null | tail -c 3)\" = \"422\" ]"
+    "[ \"\$(make_request POST http://$EC2_HOST/analyze '' '' $CURL_TIMEOUT_ANALYZE)\" = \"422\" ]"
 }
 
 run_infrastructure_tests() {
