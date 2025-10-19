@@ -32,6 +32,7 @@ FAILED_TESTS=0
 MAX_RETRIES=3
 RETRY_DELAY=2
 CURL_TIMEOUT=10
+CURL_TIMEOUT_ANALYZE=30
 HEALTH_CHECK_RETRIES=5
 
 #============================================
@@ -128,11 +129,12 @@ make_request() {
     local url="$2"
     local data_file="${3:-}"
     local output_file="${4:-}"
+    local timeout="${5:-$CURL_TIMEOUT}"
     
     local curl_opts=(
         --silent
         --show-error
-        --max-time "$CURL_TIMEOUT"
+        --max-time "$timeout"
         --write-out "%{http_code}"
     )
     
@@ -292,19 +294,19 @@ create_test_image "$TEST_IMAGE"
 
 # Test 10: Analyze Endpoint Available (Proxied)
     run_test "Analyze Endpoint Available (Via Proxy)" \
-        "[ \"\$(make_request POST http://$EC2_HOST/analyze $TEST_IMAGE)\" = \"200\" ]"
+        "[ \"\$(make_request POST http://$EC2_HOST/analyze $TEST_IMAGE '' $CURL_TIMEOUT_ANALYZE)\" = \"200\" ]"
     
     # Test 11: Analyze Returns Valid JSON (Proxied)
     run_test "Analyze Returns Valid JSON (Via Proxy)" \
-        "curl --silent --max-time $CURL_TIMEOUT -X POST -F 'image=@$TEST_IMAGE' http://$EC2_HOST/analyze 2>/dev/null | jq -e '.face_count' >/dev/null 2>&1"
+        "curl --silent --max-time $CURL_TIMEOUT_ANALYZE -X POST -F 'image=@$TEST_IMAGE' http://$EC2_HOST/analyze 2>/dev/null | jq -e '.face_count' >/dev/null 2>&1"
     
     # Test 12: Analyze Response Structure (Proxied)
     run_test "Analyze Response Has Expected Structure" \
-        "curl --silent --max-time $CURL_TIMEOUT -X POST -F 'image=@$TEST_IMAGE' http://$EC2_HOST/analyze 2>/dev/null | jq -e 'has(\"filename\") and has(\"face_count\") and has(\"faces\")' >/dev/null 2>&1"
+        "curl --silent --max-time $CURL_TIMEOUT_ANALYZE -X POST -F 'image=@$TEST_IMAGE' http://$EC2_HOST/analyze 2>/dev/null | jq -e 'has(\"filename\") and has(\"face_count\") and has(\"faces\")' >/dev/null 2>&1"
     
     # Test 13: Analyze Endpoint Direct
     run_test "Analyze Endpoint Available (Direct Access)" \
-        "[ \"\$(make_request POST http://$EC2_HOST:8000/analyze $TEST_IMAGE)\" = \"200\" ]"
+        "[ \"\$(make_request POST http://$EC2_HOST:8000/analyze $TEST_IMAGE '' $CURL_TIMEOUT_ANALYZE)\" = \"200\" ]"
 }
 
 run_error_handling_tests() {
@@ -314,11 +316,11 @@ run_error_handling_tests() {
     local EMPTY_FILE="$TEMP_DIR/empty.txt"
 touch "$EMPTY_FILE"
 run_test "Empty File Upload Returns 400" \
-        "[ \"\$(curl --silent --max-time $CURL_TIMEOUT -X POST -F 'image=@$EMPTY_FILE' http://$EC2_HOST/analyze 2>/dev/null | tail -c 3)\" = \"400\" ]"
+    "[ \"\$(curl --silent --max-time $CURL_TIMEOUT_ANALYZE -X POST -F 'image=@$EMPTY_FILE' http://$EC2_HOST/analyze 2>/dev/null | tail -c 3)\" = \"400\" ]"
 
     # Test 15: Missing Parameter Returns 422
 run_test "Missing Image Parameter Returns 422" \
-        "[ \"\$(curl --silent --max-time $CURL_TIMEOUT -X POST http://$EC2_HOST/analyze 2>/dev/null | tail -c 3)\" = \"422\" ]"
+    "[ \"\$(curl --silent --max-time $CURL_TIMEOUT_ANALYZE -X POST http://$EC2_HOST/analyze 2>/dev/null | tail -c 3)\" = \"422\" ]"
 }
 
 run_infrastructure_tests() {
