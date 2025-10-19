@@ -121,7 +121,7 @@ run_test "Frontend Contains Face Analysis Content" \
 
 # Test 6: Frontend Returns HTML
 run_test "Frontend Serves HTML Content" \
-    "curl -f -s http://$EC2_HOST/ -H 'Accept: text/html' | grep -q '<!DOCTYPE html>'" \
+    "curl -f -s http://$EC2_HOST/ -H 'Accept: text/html' | grep -qi '<!doctype html>'" \
     "success"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
