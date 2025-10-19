@@ -1,33 +1,99 @@
-import { useState } from 'react'
-import { analyzeImage } from './api/client'
-import ImageUploader from './components/ImageUploader.jsx'
-import WebcamCapture from './components/WebcamCapture.jsx'
-import PreviewCanvas from './components/PreviewCanvas.jsx'
-import ResultPanel from './components/ResultPanel.jsx'
+import { useState } from "react";
+import { analyzeImage } from "./api/client";
+import ImageUploader from "./components/ImageUploader.jsx";
+import WebcamCapture from "./components/WebcamCapture.jsx";
+import PreviewCanvas from "./components/PreviewCanvas.jsx";
+import ResultPanel from "./components/ResultPanel.jsx";
 
-export default function App(){
-  const [imageUrl,setImageUrl]=useState(null)
-  const [loading,setLoading]=useState(false)
-  const [error,setError]=useState('')
-  const [results,setResults]=useState(null)
+export default function App() {
+  const [imageUrl, setImageUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [results, setResults] = useState(null);
 
-  async function run(file,preview){
-    setImageUrl(preview); setResults(null); setError(''); setLoading(true)
-    try{ const data = await analyzeImage(file); setResults(data) }
-    catch{ setError('Something went wrong') }
-    finally{ setLoading(false) }
+  async function run(file, preview) {
+    setImageUrl(preview);
+    setResults(null);
+    setError("");
+    setLoading(true);
+    try {
+      const data = await analyzeImage(file);
+      setResults(data);
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong while analyzing the image.");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  return (<div className="container">
-    <h2>Face Analysis (Demo Preview)</h2>
-    <p className="muted">This version uses sample data (no backend yet). We will integrate FastAPI later.</p>
-    <div className="grid2">
-      <div className="card"><h3>Upload from device</h3><ImageUploader onSelected={run}/></div>
-      <div className="card"><h3>Use your camera</h3><WebcamCapture onCapture={run}/></div>
+  return (
+    <div className="app-shell">
+      <header className="app-header card">
+        <p className="eyebrow">Automation Pipeline</p>
+        <h1>Face Analysis Studio</h1>
+        <p className="muted">
+          Upload or capture an image to detect faces, estimate gender and age
+          ranges, and understand expressions ñ powered by our FastAPI backend.
+        </p>
+      </header>
+
+      <main className="app-main">
+        <section className="card step-card">
+          <div className="step-header">
+            <h2 className="section-title">1. Provide an image</h2>
+            <p className="muted">Start by dropping a file or capturing a live frame.</p>
+          </div>
+          <div className="input-grid">
+            <div className="option-panel">
+              <h3>Upload from your device</h3>
+              <p className="muted small">
+                Supports JPG, PNG or WEBP. Drag &amp; drop or browse your files.
+              </p>
+              <ImageUploader onSelected={run} />
+            </div>
+            <div className="option-panel">
+              <h3>Use your camera</h3>
+              <p className="muted small">
+                Capture a snapshot directly in the browser ñ nothing is sent
+                until you capture.
+              </p>
+              <WebcamCapture onCapture={run} />
+            </div>
+          </div>
+        </section>
+
+        {loading && (
+          <div className="status-banner" role="status">
+            <span className="spinner" aria-hidden="true" />
+            AnalyzingÖ hang tight.
+          </div>
+        )}
+        {error && (
+          <div className="status-banner status-banner--error" role="alert">
+            {error}
+          </div>
+        )}
+
+        {imageUrl && (
+          <section className="card preview-card">
+            <div className="preview-header">
+              <h2 className="section-title">2. Preview &amp; detections</h2>
+              {results?.filename && (
+                <span className="muted small">
+                  Source file: <strong>{results.filename}</strong>
+                </span>
+              )}
+            </div>
+            <PreviewCanvas imageUrl={imageUrl} results={results} />
+          </section>
+        )}
+
+        <section className="card results-card">
+          <h2 className="section-title">3. Insights</h2>
+          <ResultPanel data={results} />
+        </section>
+      </main>
     </div>
-    {loading && <p>Analyzing‚Ä¶ ‚è≥</p>}
-    {error && <p className="err">{error}</p>}
-    {imageUrl && <div className="card" style={{marginTop:16}}><PreviewCanvas imageUrl={imageUrl} results={results}/></div>}
-    <div className="card" style={{marginTop:16}}><ResultPanel data={results}/></div>
-  </div>)
+  );
 }

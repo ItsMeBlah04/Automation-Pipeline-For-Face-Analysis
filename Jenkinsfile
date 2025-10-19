@@ -4,6 +4,11 @@
 pipeline {
     agent any
 
+    // Only run pipeline for main and staging branches
+    options {
+        skipDefaultCheckout(false)
+    }
+
     environment {
         // AWS Configuration - Updated with actual values
         AWS_ACCOUNT_ID = '863518413893'
@@ -35,6 +40,14 @@ pipeline {
                     echo "Building branch: ${env.BRANCH_NAME}"
                     echo "Build number: ${env.BUILD_NUMBER}"
                     echo "================================"
+                    
+                    // Only allow main and staging branches
+                    if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'staging') {
+                        echo "Branch '${env.BRANCH_NAME}' is not configured for CI/CD. Only 'main' and 'staging' branches are allowed."
+                        echo "Skipping pipeline execution."
+                        currentBuild.result = 'ABORTED'
+                        error("Pipeline aborted: Branch '${env.BRANCH_NAME}' is not allowed")
+                    }
                 }
             }
         }
@@ -52,7 +65,7 @@ pipeline {
                     steps {
                         echo 'Building backend Docker image...'
                         script {
-                            docker.build("${DOCKER_BACKEND_IMAGE}", '-f infra/Dockerfile.backend .')
+                            docker.build("${DOCKER_BACKEND_IMAGE}", '-f backend/Dockerfile ./backend')
                         }
                     }
                 }
@@ -60,7 +73,7 @@ pipeline {
                     steps {
                         echo 'Building frontend Docker image...'
                         script {
-                            docker.build("${DOCKER_FRONTEND_IMAGE}", '-f infra/Dockerfile.frontend .')
+                            docker.build("${DOCKER_FRONTEND_IMAGE}", '-f frontend/Dockerfile ./frontend')
                         }
                     }
                 }
@@ -107,9 +120,22 @@ pipeline {
                                 BACKEND_PORT=\$(docker port \$TEST_BACKEND_CONTAINER 8000 | cut -d: -f2)
                                 echo "Backend test container running on port \$BACKEND_PORT"
                                 
-                                sleep 10
+                                # Wait for backend to initialize and load ML models
+                                sleep 15
+                                
+                                # Retry health check up to 3 times
+                                for i in {1..3}; do
+                                    if curl -f http://localhost:\$BACKEND_PORT/health 2>/dev/null; then
+                                        echo "Backend health check passed"
+                                        break
+                                    fi
+                                    echo "Health check attempt \$i failed, retrying..."
+                                    sleep 5
+                                done
+                                
+                                # Final check - fail if still not healthy
                                 curl -f http://localhost:\$BACKEND_PORT/health || exit 1
-                                curl -f http://localhost:\$BACKEND_PORT/ | grep -q 'Hello from backend' || exit 1
+                                curl -f http://localhost:\$BACKEND_PORT/docs || exit 1
                                 
                                 echo "Backend tests passed on port \$BACKEND_PORT"
                             """
@@ -137,9 +163,21 @@ pipeline {
                                 FRONTEND_PORT=\$(docker port \$TEST_FRONTEND_CONTAINER 80 | cut -d: -f2)
                                 echo "Frontend test container running on port \$FRONTEND_PORT"
                                 
-                                sleep 10
+                                # Wait for nginx to start
+                                sleep 5
+                                
+                                # Check if container is still running
+                                if ! docker ps | grep -q \$TEST_FRONTEND_CONTAINER; then
+                                    echo "ERROR: Frontend container stopped unexpectedly"
+                                    docker logs \$TEST_FRONTEND_CONTAINER
+                                    exit 1
+                                fi
+                                
+                                # Test health endpoint
                                 curl -f http://localhost:\$FRONTEND_PORT/health || exit 1
-                                curl -f http://localhost:\$FRONTEND_PORT/ | grep -q 'Hello World Frontend' || exit 1
+                                
+                                # Test that frontend serves static files
+                                curl -f http://localhost:\$FRONTEND_PORT/ | grep -qi 'Face Analysis' || exit 1
                                 
                                 echo "Frontend tests passed on port \$FRONTEND_PORT"
                             """

@@ -70,19 +70,19 @@ run_test "Backend Health Check" \
     "curl -f -s http://$EC2_HOST:8000/health -w 'Status: %{http_code}' | grep -q 'Status: 200'" \
     "success"
 
-# Test 4: Backend API Response
-run_test "Backend API Response" \
-    "curl -f -s http://$EC2_HOST:8000/ | grep -q 'Hello from backend'" \
+# Test 4: Backend API Documentation Available
+run_test "Backend API Documentation" \
+    "curl -f -s http://$EC2_HOST:8000/docs -w 'Status: %{http_code}' | grep -q 'Status: 200'" \
     "success"
 
 # Test 5: Backend JSON Response Format
 run_test "Backend JSON Response Format" \
-    "curl -f -s http://$EC2_HOST:8000/ -H 'Accept: application/json' | jq -e '.message' > /dev/null" \
+    "curl -f -s http://$EC2_HOST:8000/health -H 'Accept: application/json' | jq -e '.status' > /dev/null" \
     "success"
 
 # Test 6: Frontend Contains Expected Content
-run_test "Frontend Contains Hello World Message" \
-    "curl -f -s http://$EC2_HOST/ | grep -q 'Hello World Frontend Deployed Successfully'" \
+run_test "Frontend Contains Face Analysis Content" \
+    "curl -f -s http://$EC2_HOST/ | grep -qi 'Face Analysis'" \
     "success"
 
 # Test 7: Check if both services are running via Docker
