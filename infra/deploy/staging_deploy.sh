@@ -57,6 +57,12 @@ execute_remote "aws ecr get-login-password --region $AWS_REGION | docker login -
 echo "Step 2: Copying docker-compose configuration..."
 copy_to_remote "infra/docker-compose.remote.yml"
 
+# Step 2.5: Setup CloudWatch monitoring
+echo "Step 2.5: Setting up CloudWatch monitoring..."
+execute_remote "sudo yum install -y amazon-cloudwatch-agent || echo 'CloudWatch Agent already installed'"
+copy_to_remote "infra/cloudwatch/cwagent-config.json"
+execute_remote "sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/home/ec2-user/cwagent-config.json -s || echo 'CloudWatch Agent already running'"
+
 # Step 3: Pull latest Docker images
 echo "Step 3: Pulling latest Docker images..."
 execute_remote "docker pull $BACKEND_IMAGE"
