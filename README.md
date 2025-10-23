@@ -1,4 +1,5 @@
-﻿# Automation Pipeline for Face Analysis
+﻿# Presentation
+# Automation Pipeline for Face Analysis
 
 A fully automated CI/CD pipeline for a face analysis web application that detects faces, estimates gender and age, and analyzes emotions from uploaded images or webcam captures.
 
